@@ -1,0 +1,333 @@
+---
+title: "Analytics Project - Prediction"
+author: "Roli Srivastava"
+date: "September 29, 2018"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+##Loading data and library files
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(warn=-1) #  supress code warnings
+#load required libraries
+download.file("http://www.openintro.org/stat/data/nc.RData", destfile = "nc.RData")
+load("nc.RData")
+list.of.packages <- c("tidyverse", "knitr", "moments")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) 
+  install.packages(new.packages, repos = "http://cran.us.r-project.org")
+library(tidyverse)
+library(knitr)
+library(moments)
+vgsale <-read.csv('C:/MyData/TerryMoonClass/Project/videogamesales/vgsales.csv',header= T)
+salesData = vgsale
+```
+
+
+```{r}
+Mode <- function(x) {
+    if (is.numeric(x)) {
+        x_table <- table(x)
+        return(as.numeric(names(x_table)[which.max(x_table)]))
+    }
+}
+
+```
+
+* **Note**
+      + The dataset file (*vgsales.csv*)and RMarkdown code/script need to co-exist in same directory for successful execution of this script.
+      + DataSet Source: https://www.kaggle.com/kedokedokedo/vgsales
+
+```{r exploratory analysis}
+# Histogram to show the most popular platform
+Platform <- data.frame(table(vgsale$Platform))
+Platform$Percentage_Change <- (Platform$Freq/nrow(vgsale))*100
+
+
+ggplot(Platform, aes(x = reorder(Platform$Var1, Platform$Percentage_Change), y = Platform$Percentage_Change))+
+  labs(title = "Platform wise popularity" , x= "Platform",y= "Percentage")+
+  geom_bar(stat="identity" , fill = "red")+
+   coord_flip() 
+
+## Genre wise Analysis
+summary(vgsale$Genre)
+
+# Histogram to show the most popular genre
+Genre <- data.frame(table(vgsale$Genre))
+Genre$Percentage_Change <- (Genre$Freq/nrow(vgsale))*100
+
+ggplot(Genre, aes(x = reorder(Genre$Var1, Genre$Percentage_Change), y = Genre$Percentage_Change))+
+  labs(title = "Genre wise popularity" , x= "Genre",y= "Percentage")+
+  geom_bar(stat="identity" , fill = "black")+
+   coord_flip() 
+
+## Sale to count ratio > revenue sale per game
+best_genre <- vgsale %>% subset(Genre != "Misc")  %>% select(Genre ,Name, Global_Sales) %>% group_by(Genre) %>%
+summarise(count = n() , sales = sum(Global_Sales)) %>% arrange(desc(count))
+best_genre$sales_count_Ratio <- round(best_genre$sales / best_genre$count , 2)
+kable(best_genre)
+
+## revenue sale Genre wise
+ggplot(best_genre, aes(x = reorder(best_genre$Genre,best_genre$sales), y = best_genre$sales))+
+  labs(title = "Revenue sale genre wise" , x= "Genre",y= "global sale")+
+  geom_bar(stat="identity" , fill = "purple")+
+   coord_flip() 
+
+## revenue sale genre wise is Action , sports , shooter , role-playing , platform
+
+## revenue sale per game
+ggplot(best_genre, aes(x = reorder(best_genre$Genre,best_genre$sales_count_Ratio), y = best_genre$sales_count_Ratio))+
+  labs(title = "Revenue sale per game" , x= "Genre",y= "sale count ratio")+
+  geom_bar(stat="identity" , fill = "purple")+
+   coord_flip() 
+
+# revenue sale per game is Platform , shooter , role-playing , racing , sports
+
+# Histogram to show the most popular top 10 publisher of the games
+Publisher <- data.frame(table(vgsale$Publisher))
+Publisher <- subset(Publisher , Publisher$Freq >=400)
+kable(Publisher)
+
+Publisher$Percentage_Change <- (Publisher$Freq/nrow(vgsale))*100
+ggplot(Publisher, aes(x = reorder(Publisher$Var1, Publisher$Percentage_Change), y = Publisher$Percentage_Change))+
+  labs(title = "Publisher wise popularity" , x= "Publisher",y= "Percentage_Change")+
+  geom_bar(stat="identity" , fill = "green")+
+   coord_flip() 
+
+
+gameshare <- group_by(vgsale,vgsale$Year)
+gameshare <- summarize(gameshare,World=sum(Global_Sales),NA.=sum(NA_Sales),EU=sum(EU_Sales),JP=sum(JP_Sales),Other=sum(Other_Sales))
+
+
+
+cor(gameshare$NA.,gameshare$World)
+cor(gameshare$EU,gameshare$World)
+cor(gameshare$JP,gameshare$World)
+
+#positive correlation between NA , EU , JP sale of games vs global sales of game , when NA , EU ,JP sale increases so is global sale of games
+pairs(gameshare[,2:3])
+
+
+
+
+## Region wise Total Sales
+x <- c("World" ,"NA.","EU","Japan","Other")
+y <- c(sum(gameshare$World) , sum(gameshare$NA.), sum(gameshare$EU), sum(gameshare$JP), sum(gameshare$Other))
+gameV <- data.frame(x,y)
+
+kable(gameV)
+ggplot(gameV , aes(x,y))+
+  labs(title = "Region wise Total Sales" , x= "Region",y= "Sales")+
+  geom_bar(stat="identity" , fill = "pink")
+
+## year-region wise sale from year 2000 - 2020
+yearwise <- vgsale
+yearwise <- within(yearwise, {
+  YearSale <- as.numeric(as.vector.factor(yearwise$Year))})
+  yearwise <- subset(yearwise ,yearwise$YearSale >= 2000)
+ggplot(yearwise , aes(yearwise$YearSale,yearwise$NA_Sales))+
+  labs(title = "Year wise Total Sales 2000-2020" , x= "Year",y= "Sales")+
+  geom_bar(stat="identity" , fill = "blue")+
+   coord_flip() 
+
+## 1.Calculate a 95% confidence interval for the average NA Sales and interpret it in context.
+
+inference(y = vgsale$NA_Sales, est = "mean", type = "ci", null = 0, conflevel = 0.95 ,
+          alternative = "twosided", method = "theoretical")
+
+## 1.Calculate a 95% confidence interval for the average Europe Sales and interpret it in context.
+
+inference(y = vgsale$EU_Sales, est = "mean", type = "ci", null = 0, conflevel = 0.95 ,
+          alternative = "twosided", method = "theoretical")
+
+## 1.Calculate a 95% confidence interval for the average Japan Sales and interpret it in context.
+
+inference(y = vgsale$JP_Sales, est = "mean", type = "ci", null = 0, conflevel = 0.95 ,
+          alternative = "twosided", method = "theoretical")
+
+## 1.Calculate a 95% confidence interval for the average Global Sales and interpret it in context.
+
+inference(y = vgsale$Global_Sales, est = "mean", type = "ci", null = 0, conflevel = 0.95 ,
+          alternative = "twosided", method = "theoretical")
+
+inference(y = vgsale$Global_Sales, x = vgsale$Genre, est = "mean", type = "ht", null = 0, alternative = "greater", method = "theoretical")
+
+```
+
+## Descriptive analysis for global sale
+
+```{r echo=FALSE}
+##
+##
+dataD <- vgsale$Global_Sales
+mnQ = mean(dataD)
+modeQ = Mode(dataD)
+mdQ = median(dataD)
+sDQ= sd(dataD)
+variQ = var(dataD)
+kurQ= kurtosis(dataD)
+skeQ= skewness(dataD)
+maxQ= max(dataD)
+minQ= min(dataD)
+rangeQ = maxQ - minQ
+sumQ = sum(dataD)
+countQ = length(dataD)
+qualitydata <- matrix(c(mnQ,modeQ,mdQ,sDQ,variQ,kurQ,skeQ,maxQ,minQ,rangeQ,sumQ,countQ),ncol =1 ,byrow = TRUE)
+rownames(qualitydata) <- c('mean','mode','median','sd','var','kurtosis','skewness','max','min','range','sum','Count')
+qualitydata <- as.table(qualitydata)
+kable(qualitydata)
+
+plot(vgsale$Platform ,vgsale$Global_Sales)
+
+```
+
+## Linear equation for global sale on Genre wise
+
+```{r}
+
+m1 <- lm(Global_Sales ~ Genre, data = vgsale)
+summary(m1)
+sum(m1$residuals^2) 
+plot(vgsale$Global_Sales ,vgsale$Genre)
+abline(m1)
+## R-squared:  0.01194 
+ 
+## Y = Global_Sales , X = Genre -(X0 = Action = 0 , Xa = Adventure , Xb =Fighting , Xc = Misc , Xd = Platform , xe = Puzzle , Xf = Racing , Xg = Role-Playing, Xh = Shooter , Xi = Simulation , Xj = Sports , Xk = Strategy )
+## Y =  0.528100 - 0.342221 * Xa + 0.001275 * Xb - 0.062338 * Xc  + 0.410241 * Xd - 0.107224 * Xe  +  0.058001 * Xf + 0.095132 * Xg + 0.263785 * Xh - 0.075736 * Xi+  0.039219 * Xj - 0.270949 * Xk
+## So Breakdown is 0 and running late is 1 
+## for Action genre -  Y(Global sale) =  0.528100
+## for Adventure genre-  Y(Global sale) = 0.528100 - 0.342221 * 1 =  0.185879
+## so on and so forth
+
+m1 <- lm(Global_Sales ~ Platform, data = vgsale)
+m1 <- lm(Global_Sales ~ Publisher, data = vgsale)
+```
+
+##Market-wise Regression, ANNOVA & Prediction Analysis
+
+###For North America (NA) Market
+
+First, we build a multiple linear regression model.
+```{r modelingNA}
+#Subsetting the sales data to create a data frame with just NA sales and relevant independant variables
+naSales <- salesData[, c("Platform", "Genre", "NA_Sales")]
+#Studying the first few rows of the data frame
+head(naSales, 10)
+#Removing outliers from the codewith the 1.5 times the Inter Quartile range (IQR) rule
+naSalesNoOutlier <- filter(naSales, NA_Sales <= (quantile(naSales$NA_Sales, 0.75) + (1.5 * IQR(naSales$NA_Sales))), NA_Sales >= (quantile(naSales$NA_Sales, 0.25) - (1.5 * IQR(naSales$NA_Sales))))
+#Creating a multiple regression model
+modelNA <- lm(NA_Sales ~ Platform + Genre, data = naSalesNoOutlier)
+#Creating an ANOVA analysis
+modelNA.aov <- aov(NA_Sales ~ Platform + Genre, data = naSales)
+```
+
+Next comes displaying the results of the regression analysis.
+```{r resultsNA}
+#Displaying the output of the multiple linear regression
+summary(modelNA)
+#Displaying the reidual plots
+plot(modelNA)
+#Displaying results of ANOVA analysis
+summary(modelNA.aov)
+```
+
+Prediction a NA sales (in million units) for a particular platform and genre.
+```{r predictNA}
+predict(modelNA, data.frame(Platform = "PS3", Genre = "Shooter"))
+```
+
+###For European (EU) Market
+
+First, we build a multiple linear regression model.
+```{r modelingEU}
+#Subsetting the sales data to create a data frame with just EU sales and relevant independant variables
+euSales <- salesData[, c("Platform", "Genre", "EU_Sales")]
+#Studying the first few rows of the data frame
+head(euSales, 10)
+#Removing outliers from the codewith the 1.5 times the Inter Quartile range (IQR) rule
+euSalesNoOutlier <- filter(euSales, EU_Sales <= (quantile(euSales$EU_Sales, 0.75) + (1.5 * IQR(euSales$EU_Sales))), EU_Sales >= (quantile(euSales$EU_Sales, 0.25) - (1.5 * IQR(euSales$EU_Sales))))
+#Creating a multiple regression model
+modelEU <- lm(EU_Sales ~ Platform + Genre, data = euSalesNoOutlier)
+#Creating an ANOVA analysis
+modelEU.aov <- aov(EU_Sales ~ Platform + Genre, data = euSales)
+```
+
+Next comes displaying the results of the regression analysis.
+```{r resultsEU}
+#Displaying the output of the multiple linear regression
+summary(modelEU)
+#Displaying the reidual plots
+plot(modelEU)
+#Displaying results of ANOVA analysis
+summary(modelEU.aov)
+```
+
+Prediction a NA sales (in million units) for a particular platform and genre.
+```{r predictEU}
+predict(modelNA, data.frame(Platform = "PS4", Genre = "Platform"))
+```
+
+###For Japanese (JP) Market
+
+First, we build a multiple linear regression model.
+```{r modelingJP}
+#Subsetting the sales data to create a data frame with just JP sales and relevant independant variables
+jpSales <- salesData[, c("Platform", "Genre", "JP_Sales")]
+#Studying the first few rows of the data frame
+head(jpSales, 10)
+#Removing outliers from the codewith the 1.5 times the Inter Quartile range (IQR) rule
+jpSalesNoOutlier <- filter(jpSales, JP_Sales <= (quantile(jpSales$JP_Sales, 0.75) + (1.5 * IQR(jpSales$JP_Sales))), JP_Sales >= (quantile(jpSales$JP_Sales, 0.25) - (1.5 * IQR(jpSales$JP_Sales))))
+#Creating a multiple regression model
+modelJP <- lm(JP_Sales ~ Platform + Genre, data = jpSalesNoOutlier)
+#Creating an ANOVA analysis
+modelJP.aov <- aov(JP_Sales ~ Platform + Genre, data = jpSales)
+```
+
+Next comes displaying the results of the regression analysis.
+```{r resultsJP}
+#Displaying the output of the multiple linear regression
+summary(modelJP)
+#Displaying the reidual plots
+plot(modelJP)
+
+#Displaying results of ANOVA analysis
+summary(modelJP.aov)
+```
+
+Prediction a NA sales (in million units) for a particular platform and genre.
+```{r predictJP}
+predict(modelJP, data.frame(Platform = "PS3", Genre = "Shooter"))
+```
+
+##For Global (GB) Market
+
+First, we build a multiple linear regression model.
+```{r modelingGB}
+#Subsetting the sales data to create a data frame with just GB sales and relevant independant variables
+gbSales <- salesData[, c("Platform", "Genre", "Global_Sales")]
+#Studying the first few rows of the data frame
+head(gbSales, 10)
+#Removing outliers from the codewith the 1.5 times the Inter Quartile range (IQR) rule
+gbSalesNoOutlier <- filter(gbSales, Global_Sales <= (quantile(gbSales$Global_Sales, 0.75) + (1.5 * IQR(gbSales$Global_Sales))), Global_Sales >= (quantile(gbSales$Global_Sales, 0.25) - (1.5 * IQR(gbSales$Global_Sales))))
+#Creating a multiple regression model
+modelGB <- lm(Global_Sales ~ Platform + Genre, data = gbSalesNoOutlier)
+#Creating an ANOVA analysis
+modelGB.aov <- aov(Global_Sales ~ Platform + Genre, data = gbSales)
+```
+
+Next comes displaying the results of the regression analysis.
+```{r resultsGB}
+#Displaying the output of the multiple linear regression
+summary(modelGB)
+#Displaying the reidual plots
+plot(modelGB)
+#Displaying results of ANOVA analysis
+summary(modelGB.aov)
+```
+
+Prediction a NA sales (in million units) for a particular platform and genre.
+```{r predictGB}
+predict(modelGB, data.frame(Platform = "PS3", Genre = "Shooter"))
+```
